@@ -1,5 +1,5 @@
 {
-    "listener_limit": 16,
+    "listener_limit": 18,
     "max_monthly_transfer": 219902325555200,
 
     "relay_provider": "Alex Birkett",
@@ -16,6 +16,6 @@
     "heartbeat_required": false,
     "heartbeat_interval": 30000,
 
-    "save_interval": 1000,
+    "save_interval": 3600000,
     "redirect": "http://relay05.forever.fm/all.mp3"
 }
