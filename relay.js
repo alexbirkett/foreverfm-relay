@@ -6,12 +6,6 @@ var stats = require('./stats.json');
 
 var http = require('http');
 var fs = require('fs');
-var winston = require('winston');
-var daemon = require("daemonize2").setup({
-    main: "relay.js",
-    name: "relay",
-    pidfile: "relay.pid"
-});
 
 var options = {
     hostname: process.env.URL || "forever.fm",
@@ -33,36 +27,17 @@ fs.readFile('./crossdomain.xml', function(error, content) {
     if (!error) crossdomain = content;
 });
 
-var logger = new (winston.Logger)({
-    transports: [
-        new winston.transports.Console(
-            {
-                colorize: true,
-                timestamp: true,
-                handleExceptions: true
-            }),
-        new winston.transports.File(
-            {
-                level: 'info',
-                colorize: false,
-                timestamp: true,
-                json: false,
-                filename: 'relay.log',
-                handleExceptions: true
-            })
-    ]
-});
 
 var check = function(callback) {
-    logger.info("Attempting to connect to generator...");
+    console.log("Attempting to connect to generator...");
 
     check_opts = {'method': 'HEAD'};
     for (var a in options) check_opts[a] = options[a];
     req = http.request(check_opts, function (res) {
         if ( res.statusCode != 200 && res.statusCode != 405 ) {
-            logger.error("OH NOES: Got a " + res.statusCode);
+            console.log("OH NOES: Got a " + res.statusCode);
         } else {
-            logger.info("Got response back from generator!")
+            console.log("Got response back from generator!")
             if (typeof callback != "undefined") callback();
         }
     })
@@ -70,13 +45,13 @@ var check = function(callback) {
 }
 
 var listen = function(callback) {
-    logger.info("Attempting to listen to generator...");
+    console.log("Attempting to listen to generator...");
     req = http.request(options, function (res) {
         if ( res.statusCode != 200 ) {
-            logger.error("OH NOES: Got a " + res.statusCode);
+            console.log("OH NOES: Got a " + res.statusCode);
             setTimeout(function(){listen(callback)}, config.timeout);
         } else {
-            logger.info("Listening to generator!")
+            console.log("Listening to generator!")
             res.on('data', function (buf) {
 	    	stats.bytes_in_month += buf.length
 	   	for (l in listeners) {
@@ -85,7 +60,7 @@ var listen = function(callback) {
 	        }
             });
             res.on('end', function () {
-                logger.error("Stream ended! Restarting listener...");
+                console.log("Stream ended! Restarting listener...");
                 setTimeout(function(){listen(function(){})}, config.timeout);
             });
             if (typeof callback != "undefined") callback();
@@ -109,7 +84,7 @@ var ipof = function(req) {
 
 var available = function(response) {
     if ( listeners.length + 1 > config.listener_limit ) {
-        logger.error("Listener limit exceeded: returning 301 to relay01.");
+        console.log("Listener limit exceeded: returning 301 to relay01.");
         response.writeHead(301, {'Location': "http://relay01.forever.fm/all.mp3"});
         response.end();
         return false;
@@ -119,13 +94,13 @@ var available = function(response) {
 
 var save = function() {
     fs.writeFile("./stats.json", JSON.stringify(stats), function(err) {
-        if (err) logger.error("Could not save statistics due to: " + err);
-        else logger.info("Saved statistics.");
+        if (err) console.log("Could not save statistics due to: " + err);
+        else console.log("Saved statistics.");
     });
 }
 
 var run = function() {
-    logger.info("Starting server.")
+    console.log("Starting server.")
 
     setInterval( save, config.save_interval );
 
@@ -140,13 +115,13 @@ var run = function() {
                             if (available(response)) { 
                                 response.writeHead(200, {'Content-Type': 'audio/mpeg'});
                                 response.on('close', function () {
-                                    logger.info("Removed listener: " + request.ip);
+                                    console.log("Removed listener: " + request.ip);
                                     listeners.splice(listeners.indexOf(response), 1);
                                 });
                                 listeners.push(response);
                                 if (stats.peaks.listeners < listeners.length)
                                     stats.peaks.listeners = listeners.length;
-                                logger.info("Added listener: " + request.ip);
+                                console.log("Added listener: " + request.ip);
                             }
                             break;
                         case "HEAD":
@@ -181,24 +156,12 @@ var run = function() {
                     break;
             }
         } catch (err) {
-            logger.error(err);
+           console.log(err);
         }
     }).listen(process.env.PORT || config.port);
 }
 
-switch (process.argv[2]) {
-    case "start":
-        check(function() {
-            daemon.start();
-        });
-        break;
-    case "stop":
-        daemon.stop();
-        break;
-    default:
-        check(function() {
-          listen();
-          run();
-        });
-}
-
+check(function() {
+	listen();
+        run();
+});
